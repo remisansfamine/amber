@@ -2,6 +2,8 @@
 
 #include "AmberCharacter.h"
 #include "Camera/CameraComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/InputSettings.h"
 #include "Kismet/GameplayStatics.h"
@@ -15,18 +17,25 @@ AAmberCharacter::AAmberCharacter()
 	BaseTurnRate = 45.f;
 	BaseLookUpRate = 45.f;
 
-	// Create a CameraComponent	
-	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	FirstPersonCameraComponent->SetupAttachment(GetCapsuleComponent());
-	FirstPersonCameraComponent->SetRelativeLocation(FVector(-39.56f, 1.75f, 64.f)); // Position the camera
-	FirstPersonCameraComponent->bUsePawnControlRotation = true;
-}
+	// Don't rotate when the controller rotates. Let that just affect the camera.
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
 
-void AAmberCharacter::BeginPlay()
-{
-	// Call the base class  
-	Super::BeginPlay();
+	// Configure character movement
+	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...
+
+	// Create a camera boom (pulls in towards the player if there is a collision)
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->TargetArmLength = 300.0f; // The camera follows at this distance behind the character	
+	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
 	
+	// Create a follow camera
+    FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+    FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
+    FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
+
 }
 //////////////////////////////////////////////////////////////////////////
 // Input
@@ -35,7 +44,7 @@ void AAmberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 {
 	// set up gameplay key bindings
 	check(PlayerInputComponent);
-
+ 
 	// Bind movement events
 	PlayerInputComponent->BindAxis("MoveForward", this, &AAmberCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AAmberCharacter::MoveRight);
@@ -49,18 +58,29 @@ void AAmberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 
 void AAmberCharacter::MoveForward(float Value)
 {
-	if (Value != 0.0f)
+	if ((Controller != nullptr) && (Value != 0.0f))
 	{
-		// add movement in that direction
-		AddMovementInput(GetActorForwardVector(), Value);
+		// find out which way is forward
+		const FRotator Rotation = Controller->GetControlRotation();
+		const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+		// get forward vector
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		AddMovementInput(Direction, Value);
 	}
 }
 
 void AAmberCharacter::MoveRight(float Value)
 {
-	if (Value != 0.0f)
+	if ( (Controller != nullptr) && (Value != 0.0f) )
 	{
+		// find out which way is right
+		const FRotator Rotation = Controller->GetControlRotation();
+		const FRotator YawRotation(0, Rotation.Yaw, 0);
+	
+		// get right vector 
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 		// add movement in that direction
-		AddMovementInput(GetActorRightVector(), Value);
+		AddMovementInput(Direction, Value);
 	}
 }
