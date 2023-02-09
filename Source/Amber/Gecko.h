@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "AmberCharacter.h"
-#include "GameFramework/Character.h"
 #include "Gecko.generated.h"
 
 UCLASS()
@@ -12,7 +11,7 @@ class AMBER_API AGecko : public ACharacter
 
 protected:
 	virtual void BeginPlay() override;
-	
+
 public:
 	AGecko();
 
@@ -20,6 +19,4 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float fleeDistance = 600.f;
-	
-	void Flee();
 };
