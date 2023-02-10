@@ -4,6 +4,7 @@
 #include "Sandstorm.h"
 #include "Components/SplineComponent.h"
 #include "NiagaraComponent.h"
+#include "Components/BoxComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
@@ -36,6 +37,10 @@ void ASandstorm::BeginPlay()
 	Super::BeginPlay();
 
 	GetComponents<UNiagaraComponent>(NiagaraComponents);
+	GetComponents<UBoxComponent>(ColliderComponents);
+
+	for (UPrimitiveComponent* PrimitiveComponent : ColliderComponents)
+		PrimitiveComponent->OnComponentBeginOverlap.AddDynamic(this, &ASandstorm::OnBeginOverlap);
 	
 	if (AdvancementCurve)
 	{
@@ -55,32 +60,133 @@ void ASandstorm::OnConstruction(const FTransform& Transform)
 	
 	const int EmitterCount = UKismetMathLibrary::FTrunc(InitialSplineComponent->GetSplineLength() / EmitterDistance);
 
+	FVector BoxExtent(EmitterDistance * 0.5f, 10.f, 1000.f);
+
+	float SplineQuantity = EmitterDistance;
+	FVector CurrentSplineLocation, NextSplineLocation;
+	FVector CurrentSplineRight, NextSplineRight;
+
+	CurrentSplineLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
+	CurrentSplineRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
+	
 	for (int i = 0; i < EmitterCount; i++)
 	{
-		const float SplineQuantity = EmitterDistance * i;
-
-		FVector WorldLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(SplineQuantity, ESplineCoordinateSpace::World);
-
-		FVector SnappedWorldPosition;
+		FVector SnappedEmitterPosition;
 		
-		if (!GetSnappedWorldPosition(SnappedWorldPosition, WorldLocation, SnapRange))
-			continue;
-
-		FVector EmitterDirection = CustomWorldDirection;
-		
-		if (DirectionType != ESandstormDirection::CUSTOM)
+		if (GetSnappedWorldPosition(SnappedEmitterPosition, CurrentSplineLocation, SnapRange))
 		{
-			EmitterDirection = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(SplineQuantity, ESplineCoordinateSpace::World);
+			FVector EmitterDirection = CustomWorldDirection;
 			
-			if (DirectionType == ESandstormDirection::CCW)
-				EmitterDirection = -EmitterDirection;
+			if (DirectionType != ESandstormDirection::CUSTOM)
+			{
+				EmitterDirection = CurrentSplineRight;
+				
+				if (DirectionType == ESandstormDirection::CCW)
+					EmitterDirection = -EmitterDirection;
+			}
+			
+			FTransform EmitterRelativeTransform = UKismetMathLibrary::MakeTransform(SnappedEmitterPosition, UKismetMathLibrary::MakeRotFromX(EmitterDirection), FVector(EmitterScale));
+
+			UActorComponent* AddedComponent = AddComponentByClass(UNiagaraComponent::StaticClass(), true, EmitterRelativeTransform, false);
+			UNiagaraComponent* NiagaraComponent = Cast<UNiagaraComponent>(AddedComponent);
+			NiagaraComponent->SetAsset(NiagaraSystemAsset, false);
 		}
 		
-		FTransform EmitterRelativeTransform = UKismetMathLibrary::MakeTransform(SnappedWorldPosition, UKismetMathLibrary::MakeRotFromX(EmitterDirection), FVector(EmitterScale));
+		NextSplineLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(SplineQuantity, ESplineCoordinateSpace::World);
+		NextSplineRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(SplineQuantity, ESplineCoordinateSpace::World);
 
-		UActorComponent* AddedComponent = AddComponentByClass(UNiagaraComponent::StaticClass(), true, EmitterRelativeTransform, false);
-		UNiagaraComponent* NiagaraComponent = Cast<UNiagaraComponent>(AddedComponent);
-		NiagaraComponent->SetAsset(NiagaraSystemAsset, false);
+		FVector WorldBoxLocation = (CurrentSplineLocation + NextSplineLocation) * 0.5f;
+
+		FVector SnappedBoxLocation;
+		if (GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
+		{
+			FVector BoxDirection = (CurrentSplineRight + NextSplineRight) * 0.5f;
+
+			FTransform BoxTransform = UKismetMathLibrary::MakeTransform(SnappedBoxLocation, UKismetMathLibrary::MakeRotFromYZ(BoxDirection, FVector::UpVector), FVector::OneVector);
+		
+			UActorComponent* AddedComponent = AddComponentByClass(UBoxComponent::StaticClass(), true, BoxTransform, false);
+			UBoxComponent* BoxComponent = Cast<UBoxComponent>(AddedComponent);
+			BoxComponent->SetBoxExtent(BoxExtent, false);
+		}
+		
+		SplineQuantity += EmitterDistance;
+
+		CurrentSplineLocation = NextSplineLocation;
+		CurrentSplineRight = NextSplineRight;
+	}
+}
+
+void ASandstorm::OnAdvancementUpdate(float Ratio)
+{
+	const int EmitterCount = NiagaraComponents.Num();
+
+	const float TargetDistance = TargetSplineComponent->GetSplineLength() / static_cast<float>(EmitterCount);
+
+	float InitialSplineQuantity = EmitterDistance;
+	float TargetSplineQuantity = TargetDistance;
+	
+	FVector InitCurrentLocation, InitNextLocation, TargetCurrentLocation, TargetNextLocation;
+	FVector InitCurrentRight, InitNextRight, TargetCurrentRight, TargetNextRight;
+
+	InitCurrentLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
+	InitCurrentRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
+	
+	TargetCurrentLocation = TargetSplineComponent->GetLocationAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
+	TargetCurrentRight = TargetSplineComponent->GetRightVectorAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
+	
+	for (int i = 0; i < EmitterCount; i++)
+	{
+		const FVector CurrentInterpolatedLocation = UKismetMathLibrary::VLerp(InitCurrentLocation, TargetCurrentLocation, Ratio);
+		const FVector CurrentInterpolatedRight = UKismetMathLibrary::VLerp(InitCurrentRight, TargetCurrentRight, Ratio);;
+		
+		FVector SnappedEmitterPosition;
+		
+		if (GetSnappedWorldPosition(SnappedEmitterPosition, CurrentInterpolatedLocation, SnapRange))
+		{
+			FVector EmitterDirection = CustomWorldDirection;
+			
+			if (DirectionType != ESandstormDirection::CUSTOM)
+			{
+				EmitterDirection = UKismetMathLibrary::ProjectVectorOnToPlane(CurrentInterpolatedRight, FVector::UpVector);
+
+				if (DirectionType == ESandstormDirection::CW)
+					EmitterDirection = -EmitterDirection;
+			}
+			
+			FTransform EmitterWorldTransform = UKismetMathLibrary::MakeTransform(SnappedEmitterPosition, UKismetMathLibrary::MakeRotFromX(EmitterDirection), FVector(EmitterScale));
+
+			NiagaraComponents[i]->SetWorldTransform(EmitterWorldTransform);
+		}
+		
+		InitNextLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(InitialSplineQuantity, ESplineCoordinateSpace::World);
+		InitNextRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(InitialSplineQuantity, ESplineCoordinateSpace::World);
+
+		TargetNextLocation = TargetSplineComponent->GetLocationAtDistanceAlongSpline(TargetSplineQuantity, ESplineCoordinateSpace::World);
+		TargetNextRight = TargetSplineComponent->GetRightVectorAtDistanceAlongSpline(TargetSplineQuantity, ESplineCoordinateSpace::World);
+
+		const FVector NextInterpolatedLocation = UKismetMathLibrary::VLerp(InitNextLocation, TargetNextLocation, Ratio);
+		const FVector NextInterpolatedRight = UKismetMathLibrary::VLerp(InitNextRight, TargetNextRight, Ratio);
+
+		FVector WorldBoxLocation = (CurrentInterpolatedLocation + NextInterpolatedLocation) * 0.5f;
+
+		FVector SnappedBoxLocation;
+		if (GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
+		{
+			FVector BoxDirection = (CurrentInterpolatedRight + NextInterpolatedRight) * 0.5f;
+	
+			FTransform BoxTransform = UKismetMathLibrary::MakeTransform(SnappedBoxLocation, UKismetMathLibrary::MakeRotFromYZ(BoxDirection, FVector::UpVector), FVector::OneVector);
+		
+			ColliderComponents[i]->SetWorldTransform(BoxTransform);
+		}
+		
+		InitialSplineQuantity += EmitterDistance;
+		TargetSplineQuantity += TargetDistance;
+		
+		InitCurrentLocation = InitNextLocation;
+		TargetCurrentLocation = TargetNextLocation;
+		
+		InitCurrentRight = InitNextRight;
+		TargetCurrentRight = TargetNextRight;
 	}
 }
 
@@ -91,65 +197,31 @@ bool ASandstorm::GetSnappedWorldPosition(FVector& SnappedWorldPosition, const FV
 
 	FHitResult OutHit;
 	
-	const bool DidHit = GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, ECollisionChannel::ECC_Visibility);
+	if (!GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, ECollisionChannel::ECC_Visibility))
+		return false;
 
 	SnappedWorldPosition = OutHit.ImpactPoint;
 
-	return DidHit;
+	return true;
 }
 
 bool ASandstorm::GetSnappedRelativePosition(FVector& SnappedRelativePosition, const FVector& WorldPosition, const float Range) const
 {
-	const bool DidHit = GetSnappedWorldPosition(SnappedRelativePosition, WorldPosition, Range);
-
+	if (!GetSnappedWorldPosition(SnappedRelativePosition, WorldPosition, Range))
+		return false;
+	
 	SnappedRelativePosition = GetActorTransform().InverseTransformPosition(SnappedRelativePosition);
 	
-	return DidHit; 
-}
-
-void ASandstorm::OnAdvancementUpdate(float Ratio)
-{
-	const int EmitterCount = NiagaraComponents.Num();
-
-	const float TargetDistance = TargetSplineComponent->GetSplineLength() / static_cast<float>(EmitterCount);
-	
-	for (int i = 0; i < EmitterCount; i++)
-	{
-		const float InitialSplineQuantity = EmitterDistance * i;
-		const float TargetSplineQuantity = TargetDistance * i;
-
-		const FVector InitialWorldLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(InitialSplineQuantity, ESplineCoordinateSpace::World);
-		const FVector TargetWorldLocation = TargetSplineComponent->GetLocationAtDistanceAlongSpline(TargetSplineQuantity, ESplineCoordinateSpace::World);
-
-		const FVector InterpolatedWorldLocation = UKismetMathLibrary::VLerp(InitialWorldLocation, TargetWorldLocation, Ratio);
-
-		FVector SnappedWorldPosition;
-		
-		if (!GetSnappedWorldPosition(SnappedWorldPosition, InterpolatedWorldLocation, SnapRange))
-			continue;
-
-		FVector EmitterDirection = CustomWorldDirection;
-		
-		if (DirectionType != ESandstormDirection::CUSTOM)
-		{
-			const FVector InitialRight = InitialSplineComponent->GetLocationAtDistanceAlongSpline(InitialSplineQuantity, ESplineCoordinateSpace::World);
-			const FVector TargetRight = TargetSplineComponent->GetLocationAtDistanceAlongSpline(TargetSplineQuantity, ESplineCoordinateSpace::World);
-
-			EmitterDirection = UKismetMathLibrary::VLerp(InitialRight, TargetRight, Ratio);
-
-			EmitterDirection = -UKismetMathLibrary::ProjectVectorOnToPlane(EmitterDirection, FVector::UpVector);
-
-			if (DirectionType == ESandstormDirection::CCW)
-				EmitterDirection = -EmitterDirection;
-		}
-		
-		FTransform EmitterWorldTransform = UKismetMathLibrary::MakeTransform(SnappedWorldPosition, UKismetMathLibrary::MakeRotFromX(EmitterDirection), FVector(EmitterScale));
-
-		NiagaraComponents[i]->SetWorldTransform(EmitterWorldTransform);
-	}
+	return true; 
 }
 
 void ASandstorm::OnAdvancementFinished()
 {
 	Destroy();
+}
+
+void ASandstorm::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if(GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, FString::Printf(TEXT("%s"), *OtherActor->GetName()));
 }

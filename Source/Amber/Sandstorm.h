@@ -22,6 +22,7 @@ class AMBER_API ASandstorm : public AActor
 	GENERATED_BODY()
 
 	TArray<class UNiagaraComponent*> NiagaraComponents;
+	TArray<class UBoxComponent*> ColliderComponents;
 
 	FOnTimelineFloat AdvancementUpdatedEvent;
 	FOnTimelineEvent AdvancementFinishedEvent;
@@ -76,4 +77,6 @@ protected:
 
 	UFUNCTION()
 	void OnAdvancementFinished();
+	
+	void OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult &SweepResult);
 };
