@@ -98,7 +98,7 @@ void ASandstorm::OnConstruction(const FTransform& Transform)
 		FVector WorldBoxLocation = (CurrentSplineLocation + NextSplineLocation) * 0.5f;
 
 		FVector SnappedBoxLocation;
-		if (GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
+		if (bUseCollisions && GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
 		{
 			FVector BoxDirection = (CurrentSplineRight + NextSplineRight) * 0.5f;
 
@@ -137,7 +137,7 @@ void ASandstorm::OnAdvancementUpdate(float Ratio)
 	for (int i = 0; i < EmitterCount; i++)
 	{
 		const FVector CurrentInterpolatedLocation = UKismetMathLibrary::VLerp(InitCurrentLocation, TargetCurrentLocation, Ratio);
-		const FVector CurrentInterpolatedRight = UKismetMathLibrary::VLerp(InitCurrentRight, TargetCurrentRight, Ratio);;
+		const FVector CurrentInterpolatedRight = UKismetMathLibrary::VLerp(InitCurrentRight, TargetCurrentRight, Ratio);
 		
 		FVector SnappedEmitterPosition;
 		
@@ -170,7 +170,7 @@ void ASandstorm::OnAdvancementUpdate(float Ratio)
 		FVector WorldBoxLocation = (CurrentInterpolatedLocation + NextInterpolatedLocation) * 0.5f;
 
 		FVector SnappedBoxLocation;
-		if (GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
+		if (bUseCollisions && GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
 		{
 			FVector BoxDirection = (CurrentInterpolatedRight + NextInterpolatedRight) * 0.5f;
 	

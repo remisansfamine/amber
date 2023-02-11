@@ -62,6 +62,9 @@ public:
 	
 	virtual void OnConstruction(const FTransform& Transform) override;
 	
+	UPROPERTY(EditAnywhere)
+	bool bUseCollisions = false;
+	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
