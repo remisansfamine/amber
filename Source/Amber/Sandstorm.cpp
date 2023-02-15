@@ -161,22 +161,25 @@ void ASandstorm::OnAdvancementUpdate(float Ratio)
 		InitNextLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(InitialSplineQuantity, ESplineCoordinateSpace::World);
 		InitNextRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(InitialSplineQuantity, ESplineCoordinateSpace::World);
 
-		TargetNextLocation = TargetSplineComponent->GetLocationAtDistanceAlongSpline(TargetSplineQuantity, ESplineCoordinateSpace::World);
-		TargetNextRight = TargetSplineComponent->GetRightVectorAtDistanceAlongSpline(TargetSplineQuantity, ESplineCoordinateSpace::World);
-
-		const FVector NextInterpolatedLocation = UKismetMathLibrary::VLerp(InitNextLocation, TargetNextLocation, Ratio);
-		const FVector NextInterpolatedRight = UKismetMathLibrary::VLerp(InitNextRight, TargetNextRight, Ratio);
-
-		FVector WorldBoxLocation = (CurrentInterpolatedLocation + NextInterpolatedLocation) * 0.5f;
-
-		FVector SnappedBoxLocation;
-		if (bUseCollisions && GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
+		if (i < ColliderComponents.Num())
 		{
-			FVector BoxDirection = (CurrentInterpolatedRight + NextInterpolatedRight) * 0.5f;
+			TargetNextLocation = TargetSplineComponent->GetLocationAtDistanceAlongSpline(TargetSplineQuantity, ESplineCoordinateSpace::World);
+			TargetNextRight = TargetSplineComponent->GetRightVectorAtDistanceAlongSpline(TargetSplineQuantity, ESplineCoordinateSpace::World);
+
+			const FVector NextInterpolatedLocation = UKismetMathLibrary::VLerp(InitNextLocation, TargetNextLocation, Ratio);
+			const FVector NextInterpolatedRight = UKismetMathLibrary::VLerp(InitNextRight, TargetNextRight, Ratio);
+
+			FVector WorldBoxLocation = (CurrentInterpolatedLocation + NextInterpolatedLocation) * 0.5f;
+
+			FVector SnappedBoxLocation;
+			if (bUseCollisions && GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
+			{
+				FVector BoxDirection = (CurrentInterpolatedRight + NextInterpolatedRight) * 0.5f;
 	
-			FTransform BoxTransform = UKismetMathLibrary::MakeTransform(SnappedBoxLocation, UKismetMathLibrary::MakeRotFromYZ(BoxDirection, FVector::UpVector), FVector::OneVector);
+				FTransform BoxTransform = UKismetMathLibrary::MakeTransform(SnappedBoxLocation, UKismetMathLibrary::MakeRotFromYZ(BoxDirection, FVector::UpVector), FVector::OneVector);
 		
-			ColliderComponents[i]->SetWorldTransform(BoxTransform);
+				ColliderComponents[i]->SetWorldTransform(BoxTransform);
+			}
 		}
 		
 		InitialSplineQuantity += EmitterDistance;
