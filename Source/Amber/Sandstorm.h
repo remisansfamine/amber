@@ -34,6 +34,9 @@ public:
 	float EmitterScale = 1.f;
 
 	UPROPERTY(EditAnywhere)
+	FVector ColliderScale = FVector(500.f, 0.01f, 1000.f);
+
+	UPROPERTY(EditAnywhere)
 	UCurveFloat* AdvancementCurve = nullptr;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
