@@ -27,5 +27,5 @@ void AGeckoAIController::BeginPlay()
 	behaviorTreeComponent->StartTree(*bTree, EBTExecutionMode::Looped);
 	AGecko* gecko = Cast<AGecko>(GetPawn());
 	blackboard->SetValueAsObject(TEXT("SelfActor"), gecko);
-	blackboard->SetValueAsFloat(TEXT("fleeDistance"), gecko->fleeDistance);
+	blackboard->SetValueAsFloat(TEXT("minDistFromPlayer"), gecko->minDistFromPlayer);
 }

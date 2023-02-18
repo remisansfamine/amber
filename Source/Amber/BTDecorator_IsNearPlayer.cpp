@@ -16,8 +16,8 @@ bool UBTDecorator_IsNearPlayer::CalculateRawConditionValue(UBehaviorTreeComponen
 
 	const AGecko* gecko = Cast<AGecko>(controller->GetPawn());
 
-	const float fleeDistance = blackboard->GetValueAsFloat("fleeDistance");
+	const float minDistFromPlayer = blackboard->GetValueAsFloat("minDistFromPlayer");
 	const float distanceFromPlayer = FVector::Dist(gecko->GetActorLocation(), gecko->player->GetActorLocation());
-	
-	return distanceFromPlayer <= fleeDistance;
+
+	return distanceFromPlayer <= minDistFromPlayer;
 }

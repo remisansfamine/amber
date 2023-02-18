@@ -17,6 +17,10 @@ public:
 
 	class AAmberCharacter* player;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float fleeDistance = 600.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SelfParameters")
+	float minDistFromPlayer = 600.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SelfParameters")
+	bool isNearPlayer = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SelfParameters")
+	bool hasReachFleeDistance = false;
 };
