@@ -22,5 +22,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SelfParameters")
 	bool isNearPlayer = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SelfParameters")
+	float fleeDistance = 1000.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SelfParameters")
 	bool hasReachFleeDistance = false;
 };

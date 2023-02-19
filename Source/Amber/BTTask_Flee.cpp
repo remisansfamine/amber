@@ -15,14 +15,12 @@ EBTNodeResult::Type UBTTask_Flee::ExecuteTask(UBehaviorTreeComponent& OwnerComp,
 
 	gecko->isNearPlayer = true;
 	
-	FVector location = gecko->GetActorLocation();
-	FVector playerDir = location - gecko->player->GetActorLocation();
-	
-	location.X -= 1000.f;
+	FVector geckoLoc = gecko->GetActorLocation();
+	FVector playerDir = geckoLoc - gecko->player->GetActorLocation();
+	playerDir.Normalize();
+	geckoLoc += playerDir * gecko->fleeDistance;
 
-	controller->MoveToLocation(location, 1.f, false);	
+	controller->MoveToLocation(geckoLoc, 1.f, false);	
 
-	// gecko->hasReachFleeDistance = true;
-	
 	return EBTNodeResult::Succeeded;
 }
