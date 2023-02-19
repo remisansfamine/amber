@@ -11,6 +11,9 @@ class AMBER_API AWorm : public AActor
 {
 	GENERATED_BODY()
 	
+	void AddEmitter(const FTransform& EmitterTransform);
+	void ComputeEnvironmentIntersections(TArray<FHitResult>& OutHits, float AngleRate, int RayCount);
+
 public:	
 	// Sets default values for this actor's properties
 	AWorm();

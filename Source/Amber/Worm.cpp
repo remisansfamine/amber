@@ -17,32 +17,54 @@ AWorm::AWorm()
 
 }
 
-void AWorm::OnConstruction(const FTransform& Transform)
+void AWorm::ComputeEnvironmentIntersections(TArray<FHitResult>& OutHits, float AngleRate, int RayCount)
 {
-	float AngleRate = UKismetMathLibrary::GetPI() * 2.f / PolygonSideCount;
-	
-	float Cos = 0.f, Sin = 1.f;
+	const FVector WorldStart = GetActorTransform().TransformPosition(Radius * FVector::UpVector);
+	FVector WorldLeftStart = WorldStart, WorldRightStart = WorldStart;
 
-	FVector WorldStart = GetActorTransform().TransformPosition((FVector::UpVector * Cos + FVector::RightVector * Sin) * Radius);
-
-	float Angle = 0.f;
-	for (int i = 0; i < PolygonSideCount; i++)
+	float Cos = 0.f, Sin = 1.f, Angle = 0.f;
+	for (int i = 0; i < RayCount; i++)
 	{
 		Angle += AngleRate;
 		
 		FMath::SinCos(&Cos, &Sin, Angle);
-		const FVector LocalEnd = Radius * (Cos * FVector::UpVector + Sin * FVector::RightVector);
-		const FVector WorldEnd = GetActorTransform().TransformPosition(LocalEnd);
 
-		FHitResult OutHit;
-		if (GetWorld()->LineTraceSingleByChannel(OutHit, WorldStart, WorldEnd, ECollisionChannel::ECC_Visibility))
-		{
-			FTransform EmitterTransform = UKismetMathLibrary::MakeTransform(OutHit.ImpactPoint, FRotator::ZeroRotator, FVector::OneVector);
-			UActorComponent* AddedComponent = AddComponentByClass(UNiagaraComponent::StaticClass(), true, EmitterTransform, false);
-			UNiagaraComponent* NiagaraComponent = Cast<UNiagaraComponent>(AddedComponent);
-			NiagaraComponent->SetAsset(NiagaraSystemAsset, false);
-		}
+		const FVector LocalUp = Radius * Sin * FVector::UpVector;
+		const FVector LocalLeftEnd = Radius * Cos * FVector::LeftVector + LocalUp;
+		const FVector LocalRightEnd = Radius * Cos * FVector::RightVector + LocalUp;
 
-		WorldStart = WorldEnd;
+		const FVector WorldLeftEnd = GetActorTransform().TransformPosition(LocalLeftEnd);
+		const FVector WorldRightEnd = GetActorTransform().TransformPosition(LocalRightEnd);
+
+        {
+        	FHitResult OutHit;
+        	if (GetWorld()->LineTraceSingleByChannel(OutHit, WorldLeftStart, WorldLeftEnd, ECollisionChannel::ECC_Visibility))
+        		OutHits.Add(OutHit);
+        
+        	if (GetWorld()->LineTraceSingleByChannel(OutHit, WorldRightStart, WorldRightEnd, ECollisionChannel::ECC_Visibility))
+        		OutHits.Add(OutHit);
+        }
+
+		WorldLeftStart = WorldLeftEnd;
+		WorldRightStart = WorldRightEnd;
 	}
+}
+
+void AWorm::AddEmitter(const FTransform& EmitterTransform)
+{
+	UActorComponent* AddedComponent = AddComponentByClass(UNiagaraComponent::StaticClass(), true, EmitterTransform, false);
+	UNiagaraComponent* NiagaraComponent = Cast<UNiagaraComponent>(AddedComponent);
+	NiagaraComponent->SetAsset(NiagaraSystemAsset, false);
+}
+
+void AWorm::OnConstruction(const FTransform& Transform)
+{
+	float AngleRate = UKismetMathLibrary::GetPI() * 2.f / PolygonSideCount;
+
+	TArray<FHitResult> OutHits;
+
+	ComputeEnvironmentIntersections(OutHits, AngleRate, PolygonSideCount * 0.5f);
+
+	for (int i = 0; i < OutHits.Num(); i++)
+		AddEmitter(UKismetMathLibrary::MakeTransform(OutHits[i].ImpactPoint, FRotator::ZeroRotator, FVector::OneVector));
 }
