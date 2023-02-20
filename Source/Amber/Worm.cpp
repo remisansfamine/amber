@@ -22,16 +22,16 @@ void AWorm::ComputeEnvironmentIntersections(TArray<FHitResult>& OutHits, float A
 	const FVector WorldStart = GetActorTransform().TransformPosition(Radius * FVector::UpVector);
 	FVector WorldLeftStart = WorldStart, WorldRightStart = WorldStart;
 
-	float Cos = 0.f, Sin = 1.f, Angle = 0.f;
+	float Cos = 1.f, Sin = 0.f, Angle = 0.f;
 	for (int i = 0; i < RayCount; i++)
 	{
 		Angle += AngleRate;
 		
 		FMath::SinCos(&Cos, &Sin, Angle);
 
-		const FVector LocalUp = Radius * Sin * FVector::UpVector;
-		const FVector LocalLeftEnd = Radius * Cos * FVector::LeftVector + LocalUp;
-		const FVector LocalRightEnd = Radius * Cos * FVector::RightVector + LocalUp;
+		const FVector LocalUp = Radius * Cos * FVector::UpVector;
+		const FVector LocalLeftEnd = Radius * Sin * FVector::LeftVector + LocalUp;
+		const FVector LocalRightEnd = Radius * Sin * FVector::RightVector + LocalUp;
 
 		const FVector WorldLeftEnd = GetActorTransform().TransformPosition(LocalLeftEnd);
 		const FVector WorldRightEnd = GetActorTransform().TransformPosition(LocalRightEnd);
