@@ -13,3 +13,11 @@ void AGecko::BeginPlay()
 
 	player = Cast<AAmberCharacter>(UGameplayStatics::GetPlayerPawn(GetWorld(), 0));
 }
+
+void AGecko::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (startRoamTimer)
+		timer += DeltaTime;
+}

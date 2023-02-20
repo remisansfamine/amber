@@ -1,4 +1,5 @@
 #include "BTTask_Hide.h"
+
 #include "AIController.h"
 #include "Gecko.h"
 
@@ -14,6 +15,7 @@ EBTNodeResult::Type UBTTask_Hide::ExecuteTask(UBehaviorTreeComponent& OwnerComp,
 		gecko = Cast<AGecko>(controller->GetPawn());
 
 	gecko->hasReachFleeDistance = true;
+	gecko->isHiding = true;
 	
 	return EBTNodeResult::Succeeded;
 }
