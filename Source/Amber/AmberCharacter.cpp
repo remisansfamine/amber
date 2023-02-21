@@ -54,6 +54,8 @@ void AAmberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	// "turnrate" is for devices that we choose to treat as a rate of change, such as an analog joystick
 	PlayerInputComponent->BindAxis("Turn", this, &APawn::AddControllerYawInput);
 	PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
+
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);	
 }
 
 void AAmberCharacter::MoveForward(float Value)
