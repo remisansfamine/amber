@@ -6,7 +6,6 @@
 #include "NiagaraComponent.h"
 #include "Components/BoxComponent.h"
 #include "Kismet/KismetMathLibrary.h"
-#include "FogComponent.h"
 
 // Sets default values
 ASandstorm::ASandstorm()
@@ -275,6 +274,6 @@ void ASandstorm::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor
 	if (OtherActor == this)
 		return;
 
-	if (const UFogComponent* FogComponent = Cast<UFogComponent>(OtherActor->GetComponentByClass(UFogComponent::StaticClass())))
-		FogComponent->FogSystemComponent->Activate();
+	if (OnSandstormEnter.IsBound())
+		OnSandstormEnter.Broadcast(OverlappedComponent, OtherActor, OtherComp, OtherBodyIndex, bFromSweep, SweepResult);
 }

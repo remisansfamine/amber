@@ -7,7 +7,11 @@
 #include "Components/TimelineComponent.h"
 #include "Sandstorm.generated.h"
 
+class ASandstorm;
 class USplineComponent;
+
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_SixParams(FSandstormEnterSignature, ASandstorm, OnSandstormEnter, UPrimitiveComponent*, OverlappedComponent, AActor*, OtherActor, UPrimitiveComponent*, OtherComp, int32, OtherBodyIndex, bool, bFromSweep, const FHitResult &, SweepResult);
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FourParams(FSandstormExitSignature, ASandstorm, OnSandstormExit, UPrimitiveComponent*, OverlappedComponent, AActor*, OtherActor, UPrimitiveComponent*, OtherComp, int32, OtherBodyIndex);
 
 UENUM(BlueprintType)
 enum class ESandstormDirection : uint8 {
@@ -29,6 +33,12 @@ class AMBER_API ASandstorm : public AActor
 public:	
 	// Sets default values for this actor's properties
 	ASandstorm();
+
+	UPROPERTY(BlueprintAssignable, BlueprintCallable, Category="Collision")
+	FSandstormEnterSignature OnSandstormEnter;
+
+	UPROPERTY(BlueprintAssignable, BlueprintCallable, Category="Collision")
+	FSandstormExitSignature OnSandstormExit;
 	
 	UPROPERTY(EditAnywhere)
 	float EmitterScale = 1.f;
