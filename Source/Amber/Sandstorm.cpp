@@ -6,6 +6,7 @@
 #include "NiagaraComponent.h"
 #include "Components/BoxComponent.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "FogComponent.h"
 
 // Sets default values
 ASandstorm::ASandstorm()
@@ -38,9 +39,6 @@ void ASandstorm::BeginPlay()
 
 	GetComponents<UNiagaraComponent>(NiagaraComponents);
 	GetComponents<UBoxComponent>(ColliderComponents);
-
-	for (UPrimitiveComponent* PrimitiveComponent : ColliderComponents)
-		PrimitiveComponent->OnComponentBeginOverlap.AddDynamic(this, &ASandstorm::OnBeginOverlap);
 	
 	if (AdvancementCurve)
 	{
@@ -51,15 +49,44 @@ void ASandstorm::BeginPlay()
 	}
 }
 
-void ASandstorm::OnConstruction(const FTransform& Transform)
+void ASandstorm::AddColliderComponents(float SplineLength)
 {
-	Super::OnConstruction(Transform);
+	FVector CurrentSplineLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
+	FVector CurrentSplineRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
 
-	if (EmitterDistance == 0.f || !InitialSplineComponent)
-		return;
+	const float ColliderDistance = ColliderScale.X * 2.f;
+	const int ColliderCount = UKismetMathLibrary::FTrunc(SplineLength / ColliderDistance);
 
-	const float SplineLength = InitialSplineComponent->GetSplineLength();
-	
+	float ColliderSplineQuantity = 0.f;
+	for (int i = 0; i < ColliderCount; i++)
+	{
+		FVector NextSplineLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(ColliderSplineQuantity, ESplineCoordinateSpace::World);
+		FVector NextSplineRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(ColliderSplineQuantity, ESplineCoordinateSpace::World);
+
+		FVector WorldBoxLocation = (CurrentSplineLocation + NextSplineLocation) * 0.5f;
+
+		FVector SnappedBoxLocation;
+		if (bUseCollisions && GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
+		{
+			FVector BoxDirection = (CurrentSplineRight + NextSplineRight) * 0.5f;
+
+			FTransform BoxTransform = UKismetMathLibrary::MakeTransform(SnappedBoxLocation, UKismetMathLibrary::MakeRotFromYZ(BoxDirection, FVector::UpVector), FVector::OneVector);
+		
+			UActorComponent* AddedComponent = AddComponentByClass(UBoxComponent::StaticClass(), true, BoxTransform, false);
+			UBoxComponent* BoxComponent = Cast<UBoxComponent>(AddedComponent);
+			BoxComponent->SetBoxExtent(ColliderScale, false);
+			BoxComponent->OnComponentBeginOverlap.AddDynamic(this, &ASandstorm::OnBeginOverlap);
+		}
+		
+		ColliderSplineQuantity += ColliderDistance;
+
+		CurrentSplineLocation = NextSplineLocation;
+		CurrentSplineRight = NextSplineRight;
+	}
+}
+
+void ASandstorm::AddEmitterComponents(float SplineLength)
+{
 	const int EmitterCount = UKismetMathLibrary::FTrunc(SplineLength / EmitterDistance);
 
 	float EmitterSplineQuantity = 0.f;
@@ -89,52 +116,34 @@ void ASandstorm::OnConstruction(const FTransform& Transform)
 
 		EmitterSplineQuantity += EmitterDistance;
 	}
-
-	FVector CurrentSplineLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
-	FVector CurrentSplineRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
-	FVector NextSplineLocation, NextSplineRight;
-
-	const float ColliderDistance = ColliderScale.X * 2.f;
-	const int ColliderCount = UKismetMathLibrary::FTrunc(SplineLength / ColliderDistance);
-
-	float ColliderSplineQuantity = 0.f;
-	for (int i = 0; i < ColliderCount; i++)
-	{
-		NextSplineLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(ColliderSplineQuantity, ESplineCoordinateSpace::World);
-		NextSplineRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(ColliderSplineQuantity, ESplineCoordinateSpace::World);
-
-		FVector WorldBoxLocation = (CurrentSplineLocation + NextSplineLocation) * 0.5f;
-
-		FVector SnappedBoxLocation;
-		if (bUseCollisions && GetSnappedWorldPosition(SnappedBoxLocation, WorldBoxLocation, SnapRange))
-		{
-			FVector BoxDirection = (CurrentSplineRight + NextSplineRight) * 0.5f;
-
-			FTransform BoxTransform = UKismetMathLibrary::MakeTransform(SnappedBoxLocation, UKismetMathLibrary::MakeRotFromYZ(BoxDirection, FVector::UpVector), FVector::OneVector);
-		
-			UActorComponent* AddedComponent = AddComponentByClass(UBoxComponent::StaticClass(), true, BoxTransform, false);
-			UBoxComponent* BoxComponent = Cast<UBoxComponent>(AddedComponent);
-			BoxComponent->SetBoxExtent(ColliderScale, false);
-		}
-		
-		ColliderSplineQuantity += ColliderDistance;
-
-		CurrentSplineLocation = NextSplineLocation;
-		CurrentSplineRight = NextSplineRight;
-	}
 }
 
-void ASandstorm::OnAdvancementUpdate(float Ratio)
+void ASandstorm::AddComponents()
+{
+	const float SplineLength = InitialSplineComponent->GetSplineLength();
+	
+	AddEmitterComponents(SplineLength);
+	AddColliderComponents(SplineLength);
+}
+
+void ASandstorm::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	if (EmitterDistance != 0.f && InitialSplineComponent)
+		AddComponents();
+}
+
+void ASandstorm::MoveEmitters(float Ratio, float TargetSplineLength)
 {
 	const int EmitterCount = NiagaraComponents.Num();
-	const float TargetSplineLength = TargetSplineComponent->GetSplineLength();
 	const float EmitterTargetDistance = TargetSplineLength / static_cast<float>(EmitterCount);
 
 	float EmitterInitialSplineQuantity = 0.f, EmitterTargetSplineQuantity = 0.f;
 	for (int i = 0; i < EmitterCount; i++)
 	{
-		FVector InitCurrentLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(EmitterInitialSplineQuantity, ESplineCoordinateSpace::World);
-		FVector TargetCurrentLocation = TargetSplineComponent->GetLocationAtDistanceAlongSpline(EmitterTargetSplineQuantity, ESplineCoordinateSpace::World);
+		const FVector InitCurrentLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(EmitterInitialSplineQuantity, ESplineCoordinateSpace::World);
+		const FVector TargetCurrentLocation = TargetSplineComponent->GetLocationAtDistanceAlongSpline(EmitterTargetSplineQuantity, ESplineCoordinateSpace::World);
 		
 		const FVector CurrentInterpolatedLocation = UKismetMathLibrary::VLerp(InitCurrentLocation, TargetCurrentLocation, Ratio);
 		
@@ -145,8 +154,8 @@ void ASandstorm::OnAdvancementUpdate(float Ratio)
 			
 			if (DirectionType != ESandstormDirection::CUSTOM)
 			{
-				FVector InitCurrentRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(EmitterInitialSplineQuantity, ESplineCoordinateSpace::World);
-				FVector TargetCurrentRight = TargetSplineComponent->GetRightVectorAtDistanceAlongSpline(EmitterTargetSplineQuantity, ESplineCoordinateSpace::World);
+				const FVector InitCurrentRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(EmitterInitialSplineQuantity, ESplineCoordinateSpace::World);
+				const FVector TargetCurrentRight = TargetSplineComponent->GetRightVectorAtDistanceAlongSpline(EmitterTargetSplineQuantity, ESplineCoordinateSpace::World);
 
 				const FVector CurrentInterpolatedRight = UKismetMathLibrary::VLerp(InitCurrentRight, TargetCurrentRight, Ratio);
 
@@ -164,7 +173,9 @@ void ASandstorm::OnAdvancementUpdate(float Ratio)
 		EmitterInitialSplineQuantity += EmitterDistance;
 		EmitterTargetSplineQuantity += EmitterTargetDistance;
 	}
-
+}
+void ASandstorm::MoveColliders(float Ratio, float TargetSplineLength)
+{
 	FVector InitCurrentLocation = InitialSplineComponent->GetLocationAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
 	FVector InitCurrentRight = InitialSplineComponent->GetRightVectorAtDistanceAlongSpline(0.f, ESplineCoordinateSpace::World);
 	
@@ -221,6 +232,14 @@ void ASandstorm::OnAdvancementUpdate(float Ratio)
 	}
 }
 
+void ASandstorm::OnAdvancementUpdate(float Ratio)
+{
+	const float TargetSplineLength = TargetSplineComponent->GetSplineLength();
+	
+	MoveEmitters(Ratio, TargetSplineLength);
+	MoveColliders(Ratio, TargetSplineLength);
+}
+
 bool ASandstorm::GetSnappedWorldPosition(FVector& SnappedWorldPosition, const FVector& WorldPosition, const float Range) const
 {
 	const FVector Start = FVector(WorldPosition.X, WorldPosition.Y, WorldPosition.Z + Range);
@@ -255,6 +274,7 @@ void ASandstorm::OnBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor
 {
 	if (OtherActor == this)
 		return;
-	
-	GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, FString::Printf(TEXT("%s"), *OtherActor->GetName()));
+
+	if (const UFogComponent* FogComponent = Cast<UFogComponent>(OtherActor->GetComponentByClass(UFogComponent::StaticClass())))
+		FogComponent->FogSystemComponent->Activate();
 }

@@ -62,12 +62,19 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	class UNiagaraSystem* NiagaraSystemAsset = nullptr;
-	
+
+	void AddColliderComponents(float SplineLength);
+	void AddEmitterComponents(float SplineLength);
+	void AddComponents();
+
 	virtual void OnConstruction(const FTransform& Transform) override;
 	
 	UPROPERTY(EditAnywhere)
 	bool bUseCollisions = false;
-	
+
+	void MoveEmitters(float Ratio, float TargetSplineLength);
+	void MoveColliders(float Ratio, float TargetSplineLength);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
