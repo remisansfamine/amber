@@ -5,6 +5,7 @@
 
 #include "Kismet/KismetMathLibrary.h"
 #include "NiagaraComponent.h"
+#include "Components/SphereComponent.h"
 
 // Sets default values
 AWorm::AWorm()
@@ -19,7 +20,7 @@ AWorm::AWorm()
 
 void AWorm::ComputeEnvironmentIntersections(TArray<FHitResult>& OutHits, float AngleRate, int RayCount)
 {
-	const FVector WorldStart = GetActorTransform().TransformPosition(Radius * FVector::UpVector);
+	const FVector WorldStart = GetActorTransform().TransformPosition(TorusRadius * FVector::UpVector);
 	FVector WorldLeftStart = WorldStart, WorldRightStart = WorldStart;
 
 	float Cos = 1.f, Sin = 0.f, Angle = 0.f;
@@ -29,9 +30,9 @@ void AWorm::ComputeEnvironmentIntersections(TArray<FHitResult>& OutHits, float A
 		
 		FMath::SinCos(&Cos, &Sin, Angle);
 
-		const FVector LocalUp = Radius * Sin * FVector::UpVector;
-		const FVector LocalLeftEnd = Radius * Cos * FVector::LeftVector + LocalUp;
-		const FVector LocalRightEnd = Radius * Cos * FVector::RightVector + LocalUp;
+		const FVector LocalUp = TorusRadius * Sin * FVector::UpVector;
+		const FVector LocalLeftEnd = TorusRadius * Cos * FVector::LeftVector + LocalUp;
+		const FVector LocalRightEnd = TorusRadius * Cos * FVector::RightVector + LocalUp;
 
 		const FVector WorldLeftEnd = GetActorTransform().TransformPosition(LocalLeftEnd);
 		const FVector WorldRightEnd = GetActorTransform().TransformPosition(LocalRightEnd);
@@ -57,14 +58,26 @@ void AWorm::AddEmitter(const FTransform& EmitterTransform)
 	NiagaraComponent->SetAsset(NiagaraSystemAsset, false);
 }
 
+void AWorm::AddCollider(const FTransform& EmitterTransform)
+{
+	UActorComponent* AddedComponent = AddComponentByClass(USphereComponent::StaticClass(), true, EmitterTransform, false);
+	USphereComponent* SphereComponent = Cast<USphereComponent>(AddedComponent);
+	SphereComponent->SetSphereRadius(TorusThickness);
+	SphereComponent->SetCollisionProfileName("BlockAll");
+}
+
 void AWorm::OnConstruction(const FTransform& Transform)
 {
 	float AngleRate = UKismetMathLibrary::GetPI() * 2.f / PolygonSideCount;
 
 	TArray<FHitResult> OutHits;
 
-	ComputeEnvironmentIntersections(OutHits, AngleRate, PolygonSideCount * 0.5f);
+	ComputeEnvironmentIntersections(OutHits, AngleRate, PolygonSideCount);
 
 	for (int i = 0; i < OutHits.Num(); i++)
-		AddEmitter(UKismetMathLibrary::MakeTransform(OutHits[i].ImpactPoint, FRotator::ZeroRotator, FVector::OneVector));
+	{
+		FTransform HitTransform = UKismetMathLibrary::MakeTransform(OutHits[i].ImpactPoint, FRotator::ZeroRotator, FVector::OneVector);
+		AddEmitter(HitTransform);
+		AddCollider(HitTransform);
+	}
 }
